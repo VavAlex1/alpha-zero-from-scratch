@@ -23,13 +23,124 @@ class ConnectFour:
     
     def get_next_state(self, state, action, player):
         state = state.copy()
-        column = state[:, action]
-        empty = np.where(column == 0)[0][-1]
-        state[empty, action] = player
+        row = np.max(np.where(state[:, action] == 0))
+        state[row, action] = player
         return state
 
     def get_valid_moves(self, state):
         return (state[0] == 0).astype(np.uint8)
     
     def check_win(self, state, action):
-        
+        if action == None:
+            return False
+
+        column = action
+        row = np.min(np.where(state[:, action] != 0))
+        player = state[row, column]
+
+        def count(offset_row, offset_column):
+            for i in range(1, self.in_a_row):
+                r = row + offset_row * i
+                c = column + offset_column * i
+                if (
+                    r < 0
+                    or r >= self.row_count
+                    or c < 0
+                    or c >= self.column_count
+                    or state[r][c] != player
+                ):
+                    return i - 1
+
+            return self.in_a_row - 1
+                
+        return (
+            count(1, 0) + 1 >= self.in_a_row
+            or count(0, 1) + count(0, -1) + 1 >= self.in_a_row
+            or count(1, 1) + count(-1, -1) + 1 >= self.in_a_row
+            or count(1, -1) + count(-1, 1) + 1 >= self.in_a_row
+        )
+
+    def get_value_and_terminated(self, state, action):
+        if self.check_win(state, action):
+            return 1, True
+        if np.sum(self.get_valid_moves(state)) == 0:
+            return 0, True
+        return 0, False
+    
+    def get_opponent(self, player):
+        return -player
+
+    def get_opponent_value(self, value):
+        return -value
+
+    def change_perspective(self, state, player):
+        return state * player
+
+    def get_encoded_state(self, state):
+        encoded_state = np.stack(
+            (state == -1, state == 0, state == 1)
+        ).astype(np.float32)
+
+        return encoded_state
+
+
+class Node:
+    def __init__(self, game: ConnectFour, args, state, parent=None, action_taken=None):
+        self.game = game
+        self.args = args
+        self.state = state
+        self.parent = parent
+        self.action_taken = action_taken
+
+        self.children = []
+        self.expandable_moves = game.get_valid_moves(state)
+
+        self.visit_count = 0
+        self.value_sum = 0
+
+    def is_fully_expanded(self):
+        return np.sum(self.expandable_moves) == 0 and len(self.children) > 0
+
+    def get_ucb(self, child):
+        q_value = 1 - ((child.value_sum / child.visit_count) + 1) / 2
+        return q_value + self.args["C"] * math.sqrt(math.log(self.visit_count) / child.visit_count)
+
+    def select(self):
+        best_child = None
+        best_ucb = -np.inf
+
+        for child in self.children:
+            ucb = self.get_ucb(child)
+            if ucb > best_ucb:
+                best_ucb = ucb
+                best_child = child
+
+        return best_child
+
+    def expand(self):
+        action = np.random.choice(np.where(self.expandable_moves == 1)[0])
+        self.expandable_moves[action] = 0
+
+        child_state = self.state.copy()
+        child_state = self.game.get_next_state(child_state, action, 1)
+        child_state = self.game.change_perspective(child_state, player=-1)
+
+        child = Node(self.game, self.args, child_state, self, action)
+        self.children.append(child)
+        return child
+
+    def simulate(self):
+        value, is_terminal = self.game.get_value_and_terminated(self.state, self.action_taken)
+        value = self.game.get_opponent_value(value)
+
+        if is_terminal:
+            return value
+
+        rollout_state = self.
+
+
+class MCTS:
+    def __init__(self, game, args):
+        self.game = game
+        self.args = args
+    
