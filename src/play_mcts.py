@@ -1,6 +1,9 @@
+import time
+
 import numpy as np
 
 from game import ConnectFour
+from mcts import MCTS
 
 
 def print_board(state):
@@ -12,10 +15,16 @@ def print_board(state):
 
 def main():
     game = ConnectFour()
+    args = {
+        "C": 2,
+        "num_searches": 1000,
+    }
+    mcts = MCTS(game, args)
+
     state = game.get_initial_state()
     player = 1
-
     human_player = 1
+
     while True:
         print()
         print_board(state)
@@ -30,8 +39,12 @@ def main():
                 continue
             action = int(raw)
         else:
-            action = np.random.choice(np.where(valid_moves == 1)[0])
-            print(f"random agent ({player}) plays {action}")
+            neutral_state = game.change_perspective(state, player)
+            start = time.time()
+            action_probs = mcts.search(neutral_state)
+            elapsed = time.time() - start
+            action = int(np.argmax(action_probs))
+            print(f"mcts ({player}) plays {action} (thought for {elapsed:.2f}s)")
 
         state = game.get_next_state(state, action, player)
         value, is_terminal = game.get_value_and_terminated(state, action)
