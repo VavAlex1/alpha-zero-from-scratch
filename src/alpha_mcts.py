@@ -45,7 +45,7 @@ class Node:
             if prob > 0:
                 child_state = self.state.copy()
                 child_state = self.game.get_next_state(child_state, action, 1)
-                child_state = self.game.change_perspective(child_state)
+                child_state = self.game.change_perspective(child_state, player=-1)
 
                 child = Node(
                     game=self.game,
@@ -53,7 +53,7 @@ class Node:
                     state=child_state,
                     parent = self,
                     action_taken=action,
-                    pripr=prob
+                    prior=prob
                 )
                 self.children.append(child)
 
@@ -100,7 +100,7 @@ class MCTS:
 
                 node.expand(policy)
 
-            node.backpropagate()
+            node.backpropagate(value)
 
         action_probs = np.zeros(self.game.action_size)
         for child in root.children:
