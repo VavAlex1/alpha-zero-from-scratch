@@ -8,7 +8,15 @@ import torch
 import torch.nn.functional as F
 
 
-class AlphaZero:
+class SPG:
+    def __init__(self, game: ConnectFour):
+        self.state = game.get_initial_state()
+        self.memory = []
+        self.root = None
+        self.node = None
+
+
+class AlphaZeroParallel:
     def __init__(self, model: ResNet, optimizer, game: ConnectFour, args):
         self.model = model
         self.optimizer = optimizer
@@ -17,12 +25,14 @@ class AlphaZero:
         self.mcts = MCTS(game, args, model)
 
     def selfPlay(self):
-        memory = []
+        return_memory = []
         player = 1
-        state = self.game.get_initial_state()
+        spGames = [SPG(self.game) for spg in range(self.args['num_parallel_games'])]
 
-        while True:
-            neutral_state = self.game.change_perspective(state, player)
+        while len(spGames) > 0:
+            states = np.stack([spg.state for spg in spGames])
+            neutral_state = self.game.change_perspective(states, player)
+
             action_probs = self.mcts.search(neutral_state)
 
             memory.append((neutral_state, action_probs, player))
